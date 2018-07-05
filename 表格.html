@@ -41,12 +41,11 @@
     <div class="add">
       品牌名称:
       <input type="text" v-model.trim="value">
-      <input :disabled="value.length === 0" type="button" value="添加" @click="handleAdd">
+      <input type="button" value="添加" @click="handleAdd" :disabled="list.length === 0">
     </div>
-
     <div class="add">
       品牌名称:
-      <input type="text" placeholder="请输入搜索条件">
+      <input type="text" placeholder="请输入搜索条件" v-model="keywords">
     </div>
 
     <div>
@@ -57,50 +56,88 @@
           <th>创立时间</th>
           <th>操作</th>
         </tr>
-        <tr :key='index' v-for="(item,index) in list">
+        <tr :key="item.index" v-for="(item,index) in list">
           <td>{{index+1}}</td>
           <td>{{item.name}}</td>
-          <td>{{item.time}}</td>
+          <td>{{item.time | fm('YYYY-MM-DD HH:mm:ss')}}</td>
           <td>
-            <a href="#" @click.prevent="handleDel(index)">删除</a>
+            <a href="#" @click="handleDel(item.id)">删除</a>
           </td>
         </tr>
-        <tr v-show="list.length === 0">
+        <tr v-if="list.lenth === 0">
           <td colspan="4">没有品牌数据</td>
         </tr>
       </table>
     </div>
   </div>
-  <script src="vue.js"></script>
+  <script src="../vue.js"></script>
+  <script src="../axios.js"></script>
+  <script src="../moment.js"></script>
   <script>
-    new Vue({
-      el:'#app',
-      data:{
-        list:[
-          { name: 'LV', time: '2011-1-1' },
-          { name: 'Apple', time: '1999-2-1'},
-          { name: 'Lenovo', time: '1989-2-1'},
-          { name: 'GR', time: '1997-2-1'}
-        ],
-        value:''
+    // 对日期进行格式化
+    Vue.filter('fm', (time, formatStr) => {
+      return moment(time).format(formatStr);
+    })
+    var fm = new Vue({
+      el: '#app',
+      data: {
+        list: [],
+        value: '',
+        keywords: ''
+      },
+      // 当页面加载完闭后执行
+      mounted() {
+        // 加载列表数据
+        this.loadData()
       },
       methods: {
-        handleAdd(){
-          if(this.value.length === 0){
-            alert('请输入内容');
+        // 加载数据
+        loadData() {
+          axios
+            .get('http://localhost:3000/list')
+            .then((res) => {
+              this.list = res.data
+            })
+        },
+        handleAdd() {
+          axios
+            .post('http://localhost:3000/list', {
+              name: this.value,
+              time: new Date()
+            })
+            .then((res) => {
+              if (res.status == 201) {
+                this.loadData();
+              } else {
+                alert('添加失败')
+              }
+            })
+        },
+        handleDel(id) {
+          if (!confirm('确认要删除么?')) {
             return;
           }
-          this.list.push({
-            name:this.value,
-            time:new Date()
-          })
-          this.value = '';
-        },
-        handleDel(index){
-          if(confirm('确定要删除吗')){
-            this.list.splice(index,1)
-          }
-         
+          axios
+            .delete('http://localhost:3000/list/' + id)
+            .then((res) => {
+              if (res.status === 200) {
+                this.loadData();
+              } else {
+                alert('删除失败');
+              }
+            })
+        }
+      },
+      watch: {
+        // 监听的是data中的属性searchValue
+        keywords(newValue, oldValue) {
+          // console.log(newValue, oldValue);
+          // 发送异步请求
+          axios
+            .get('http://127.0.0.1:3000/list?name_like=' + newValue)
+            .then((res) => {
+              this.list = res.data;
+            });
         }
       }
     })
